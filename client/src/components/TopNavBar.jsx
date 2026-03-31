@@ -39,7 +39,7 @@ function TopNavBar({
             NiroCore
           </Link>
 
-          <nav className="hidden items-center gap-6 md:flex">
+          <div className="hidden items-center gap-6 md:flex" role="navigation">
             {navItems.map((item) => {
               const isActive = item.key === activePage
 
@@ -57,7 +57,7 @@ function TopNavBar({
                 </Link>
               )
             })}
-          </nav>
+          </div>
         </div>
 
         <div className="flex items-center gap-3">
@@ -118,7 +118,7 @@ function TopNavBar({
           menuOpen ? 'max-h-64 py-3' : 'max-h-0 py-0'
         }`}
       >
-        <nav className="flex flex-col px-4">
+        <div className="flex flex-col px-4" role="navigation">
           {navItems.map((item) => {
             const isActive = item.key === activePage
             return (
@@ -156,7 +156,7 @@ function TopNavBar({
           >
             Scan Screenshot
           </button>
-        </nav>
+        </div>
       </div>
       <div className="h-[1px] bg-slate-100/50" />
     </nav>
