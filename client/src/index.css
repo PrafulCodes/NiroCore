@@ -1,0 +1,117 @@
+@import "tailwindcss";
+
+.material-symbols-outlined {
+	font-family: 'Material Symbols Outlined';
+	font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+	font-style: normal;
+	display: inline-block;
+	line-height: 1;
+	text-transform: none;
+	letter-spacing: normal;
+	word-wrap: normal;
+	white-space: nowrap;
+	direction: ltr;
+}
+
+.glass-effect {
+	backdrop-filter: blur(20px);
+	-webkit-backdrop-filter: blur(20px);
+}
+
+.signature-gradient {
+	background: linear-gradient(135deg, #0040e0 0%, #2e5bff 100%);
+}
+
+.editorial-shadow {
+	box-shadow: 0 8px 32px -4px rgba(25, 27, 36, 0.06);
+}
+
+body {
+	font-family: 'Inter', sans-serif;
+	background: #faf8ff;
+	color: #191b24;
+}
+
+html {
+	scroll-behavior: smooth;
+}
+
+* {
+	-webkit-tap-highlight-color: transparent;
+}
+
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+	font-family: 'Manrope', sans-serif;
+}
+
+button,
+a,
+[role='button'] {
+	@apply transition-all duration-200 active:scale-95;
+}
+
+button:focus-visible,
+a:focus-visible,
+[role='button']:focus-visible {
+	outline: none;
+	box-shadow: 0 0 0 2px rgba(0, 64, 224, 0.4);
+}
+
+@keyframes shake {
+	0%, 100% { transform: translateX(0); }
+	25% { transform: translateX(-8px); }
+	75% { transform: translateX(8px); }
+}
+
+.hero-gradient {
+	background: linear-gradient(
+		135deg,
+		rgba(0,64,224,0.04) 0%,
+		rgba(0,109,66,0.03) 50%,
+		rgba(172,6,27,0.02) 100%
+	);
+}
+
+.scrollbar-hide::-webkit-scrollbar { display: none; }
+.scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
+
+@keyframes shimmer {
+	0%   { opacity: 0.5; }
+	50%  { opacity: 1; }
+	100% { opacity: 0.5; }
+}
+
+.animate-shimmer {
+	animation: shimmer 1.5s ease-in-out infinite;
+}
+
+@keyframes progress-fill {
+	0%   { width: 0%; }
+	100% { width: 90%; }
+}
+
+.animate-progress-fill {
+	animation: progress-fill 3s ease-out forwards;
+}
+
+@media (max-width: 640px) {
+	[data-hot-toast-container] {
+		top: 80px !important;
+		left: 50% !important;
+		transform: translateX(-50%) !important;
+		right: auto !important;
+	}
+}
+
+nav {
+  position: fixed !important;
+  top: 0 !important;
+  left: 0 !important;
+  right: 0 !important;
+  z-index: 9999 !important;
+}
