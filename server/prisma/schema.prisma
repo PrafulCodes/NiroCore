@@ -28,6 +28,7 @@ model Subscription {
   sourceType      String        @default("manual")
   status          String        @default("active")
   notes           String?
+  remindersJson   String?       @default("{\"push\":true,\"email\":true,\"sms\":false,\"whatsapp\":false}")
   reminderLogs    ReminderLog[]
   createdAt       DateTime      @default(now())
   updatedAt       DateTime      @updatedAt

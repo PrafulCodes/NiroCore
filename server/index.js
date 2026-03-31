@@ -7,6 +7,7 @@ import rateLimit from 'express-rate-limit';
 import subscriptionRoutes from './routes/subscriptions.js';
 import ocrRoutes from './routes/ocr.js';
 import remindersRoutes from './routes/reminders.js';
+import userRoutes from './routes/users.js';
 
 import errorHandler from './middleware/errorHandler.js';
 import { startScheduler } from './scheduler.js';
@@ -19,11 +20,12 @@ const PORT = process.env.PORT || 5000;
 // Request Logging
 app.use(morgan('dev'));
 
-// Hardened CORS
+// Flexible CORS for local development
 app.use(cors({
-  origin: 'http://localhost:5173',
-  methods: ['GET', 'POST', 'PATCH', 'DELETE'],
-  allowedHeaders: ['Content-Type'],
+  origin: /^http:\/\/localhost:\d{4}$/,
+  methods: ['GET', 'POST', 'PATCH', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
+  credentials: true,
 }));
 
 app.use(express.json());
@@ -80,6 +82,7 @@ app.use('/api/ocr/extract', ocrLimiter);
 app.use('/api/ocr', ocrRoutes);
 app.use('/api/reminders/trigger', reminderLimiter);
 app.use('/api/reminders', remindersRoutes);
+app.use('/api/user', userRoutes);
 
 // Not Found Handler (404)
 app.use((req, res) => {

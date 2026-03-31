@@ -5,6 +5,8 @@ import { motion } from 'framer-motion'
 import api from '../api/client'
 import PageLayout from '../components/PageLayout'
 import PageTransition from '../components/PageTransition'
+import PhoneInputModal from '../components/PhoneInputModal'
+import { useAuth } from '../contexts/AuthContext'
 import { useDocumentTitle } from '../hooks/useDocumentTitle'
 
 const CATEGORIES = [
@@ -64,11 +66,17 @@ function AddManuallyPage() {
     serviceName:     '',
     amount:          '',
     billingCycle:    'Monthly',
-    nextRenewalDate: '',
+    nextRenewalDate: new Date().toISOString().split('T')[0], // Default to today
     category:        'OTT',
     notes:           '',
-    reminders: { push: true, email: false, sms: false },
+    reminders: { push: true, email: false, sms: false, whatsapp: false },
   })
+
+  // Local state for phone validation
+  const { user } = useAuth()
+  const [showPhoneModal, setShowPhoneModal] = useState(false)
+  const [pendingSubmit, setShowPendingSubmit] = useState(false)
+  const [userPhone, setUserPhone] = useState(user?.user_metadata?.phone || null)
 
   const [selectedReminder, setSelectedReminder] = useState('1day')
   const [errors,           setErrors]           = useState({})
@@ -114,6 +122,13 @@ function AddManuallyPage() {
       return
     }
 
+    // Check if phone number is required but missing
+    const needsPhone = formData.reminders.sms || formData.reminders.whatsapp
+    if (needsPhone && !userPhone) {
+      setShowPhoneModal(true)
+      return
+    }
+
     setSubmitting(true)
     try {
       await api.post('/api/subscriptions', {
@@ -124,6 +139,8 @@ function AddManuallyPage() {
         category:        formData.category,
         sourceType:      'manual',
         notes:           formData.notes || null,
+        reminders:       formData.reminders,
+        userEmail:       user?.email
       })
       toast.success('Subscription added!')
       navigate('/dashboard')
@@ -254,7 +271,8 @@ function AddManuallyPage() {
                     name="nextRenewalDate"
                     value={formData.nextRenewalDate}
                     onChange={handleChange}
-                    className={`${inputClass(errors, 'nextRenewalDate')} pr-12 text-base md:text-sm min-h-[48px]`}
+                    onClick={(e) => e.target.showPicker?.()}
+                    className={`${inputClass(errors, 'nextRenewalDate')} pr-12 text-base md:text-sm min-h-[48px] cursor-pointer`}
                   />
                   <span className="material-symbols-outlined pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-on-surface-variant text-lg">
                     calendar_month
@@ -325,6 +343,7 @@ function AddManuallyPage() {
                   { key: 'push',  label: 'Push Notification' },
                   { key: 'email', label: 'Email' },
                   { key: 'sms',   label: 'SMS' },
+                  { key: 'whatsapp', label: 'WhatsApp' },
                 ].map(ch => (
                   <label key={ch.key} className="flex items-center gap-2.5 cursor-pointer">
                     <input
@@ -392,6 +411,16 @@ function AddManuallyPage() {
             </div>
           </form>
         </div>
+        <PhoneInputModal 
+          isOpen={showPhoneModal} 
+          onClose={() => setShowPhoneModal(false)}
+          userEmail={user?.email}
+          onPhoneUpdated={(phone) => {
+            setUserPhone(phone)
+            // Optional: immediately trigger submit or let user click again
+            toast.success('Phone updated. You can now save your subscription.')
+          }}
+        />
       </PageTransition>
     </PageLayout>
   )

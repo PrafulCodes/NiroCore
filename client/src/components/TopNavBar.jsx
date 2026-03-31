@@ -1,5 +1,6 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
+import { useAuth } from '../contexts/AuthContext'
 
 const navItems = [
   { label: 'Home', key: 'home', to: '/' },
@@ -13,17 +14,26 @@ function TopNavBar({
   onAddManually,
   onScanScreenshot,
   onNotifications,
-  onSettings,
-  avatarSrc,
-  avatarAlt = 'User avatar',
 }) {
   const navigate = useNavigate()
+  const { user, signOut } = useAuth()
   const [menuOpen, setMenuOpen] = useState(false)
+  const [dropdownOpen, setDropdownOpen] = useState(false)
 
   const handleAddManually = onAddManually || (() => navigate('/add'))
   const handleScanScreenshot = onScanScreenshot || (() => navigate('/scan'))
   const handleNotifications = onNotifications || (() => navigate('/notifications'))
-  const handleSettings = onSettings || (() => navigate('/dashboard'))
+
+  // Close dropdown on outside click
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (!e.target.closest('.relative')) {
+        setDropdownOpen(false)
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [])
 
   return (
     <nav
@@ -86,22 +96,89 @@ function TopNavBar({
             <span className="material-symbols-outlined">notifications</span>
           </button>
 
-          <button
-            type="button"
-            onClick={handleSettings}
-            aria-label="Settings"
-            className="hidden h-10 w-10 items-center justify-center rounded-lg text-on-surface-variant transition-colors hover:bg-surface-container hover:brightness-110 focus:outline-none focus:ring-2 focus:ring-primary/40 focus:ring-offset-2 md:flex"
-          >
-            <span className="material-symbols-outlined">settings</span>
-          </button>
 
-          <div className="flex h-10 w-10 items-center justify-center overflow-hidden rounded-full border-2 border-white bg-surface-container-high">
-            {avatarSrc ? (
-              <img src={avatarSrc} alt={avatarAlt} className="h-full w-full object-cover" />
-            ) : (
-              <span className="material-symbols-outlined text-on-surface-variant">person</span>
-            )}
-          </div>
+
+          {/* User profile dropdown or Sign In button */}
+          {user ? (
+            <div className="relative">
+              <button
+                onClick={() => setDropdownOpen(!dropdownOpen)}
+                className="flex items-center gap-2 cursor-pointer hover:opacity-80 transition-opacity active:scale-95"
+              >
+                {user?.user_metadata?.avatar_url ? (
+                  <img 
+                    src={user.user_metadata.avatar_url}
+                    className="w-9 h-9 rounded-full border-2 border-white shadow-sm object-cover"
+                    alt="User profile"
+                  />
+                ) : (
+                  <div className="w-9 h-9 rounded-full bg-primary flex items-center justify-center text-white font-bold text-sm">
+                    {user?.email?.[0]?.toUpperCase() || 'U'}
+                  </div>
+                )}
+              </button>
+
+              {dropdownOpen && (
+                <div className="absolute right-0 top-full mt-2 w-56 bg-surface-container-lowest rounded-2xl shadow-[0_16px_48px_-8px_rgba(25,27,36,0.12)] border border-outline-variant/10 overflow-hidden z-[10000]">
+                  {/* User info */}
+                  <div className="px-4 py-3 border-b border-outline-variant/10">
+                    <p className="font-semibold text-sm text-on-surface truncate">
+                      {user?.user_metadata?.full_name || 'User'}
+                    </p>
+                    <p className="text-xs text-on-surface-variant truncate mt-0.5">
+                      {user?.email}
+                    </p>
+                  </div>
+                  
+                  {/* Menu items */}
+                  <div className="p-2">
+                    <button
+                      onClick={() => {
+                        navigate('/account')
+                        setDropdownOpen(false)
+                      }}
+                      className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm text-on-surface hover:bg-surface-container transition-colors cursor-pointer text-left"
+                    >
+                      <span className="material-symbols-outlined text-[20px]">manage_accounts</span>
+                      My Account
+                    </button>
+                    
+                    <button
+                      onClick={() => {
+                        navigate('/dashboard')
+                        setDropdownOpen(false)
+                      }}
+                      className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm text-on-surface hover:bg-surface-container transition-colors cursor-pointer text-left"
+                    >
+                      <span className="material-symbols-outlined text-[20px]">dashboard</span>
+                      Dashboard
+                    </button>
+                    
+                    <div className="border-t border-outline-variant/10 mt-1 pt-1">
+                      <button
+                        onClick={async () => {
+                          await signOut()
+                          navigate('/')
+                          setDropdownOpen(false)
+                        }}
+                        className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm text-error hover:bg-error/5 transition-colors cursor-pointer text-left"
+                      >
+                        <span className="material-symbols-outlined text-[20px]">logout</span>
+                        Sign Out
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          ) : (
+            <button
+              onClick={() => navigate('/login')}
+              className="flex h-10 w-10 items-center justify-center rounded-lg text-on-surface-variant transition-colors hover:bg-surface-container hover:brightness-110 focus:outline-none focus:ring-2 focus:ring-primary/40 focus:ring-offset-2"
+            >
+              <span className="material-symbols-outlined">person</span>
+            </button>
+          )}
 
           <button
             type="button"

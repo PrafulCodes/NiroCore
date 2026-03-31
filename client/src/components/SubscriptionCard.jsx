@@ -39,15 +39,9 @@ function SubscriptionCard({
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ delay: index * 0.05, duration: 0.3 }}
-      role="button"
-      tabIndex={0}
-      onClick={onView}
-      onKeyDown={(e) => {
-        if (e.key !== 'Enter' && e.key !== ' ') return
-        e.preventDefault()
-        onView()
-      }}
-      className="editorial-shadow cursor-pointer rounded-xl border border-transparent bg-surface-container-lowest p-6 transition-all duration-200 hover:shadow-lg hover:-translate-y-0.5 hover:border-primary/20 focus:outline-none focus:ring-2 focus:ring-primary/40 focus:ring-offset-2"
+      role="region"
+      aria-label={`${name} subscription card`}
+      className="editorial-shadow rounded-xl border border-transparent bg-surface-container-lowest p-6 transition-all duration-200 hover:shadow-md hover:border-outline-variant/20 focus-within:ring-2 focus-within:ring-primary/40"
     >
       <div className="flex items-start justify-between gap-4">
         <div className="flex min-w-0 items-start gap-4">
@@ -119,9 +113,13 @@ function SubscriptionCard({
             e.stopPropagation()
             onCancel()
           }}
-          className="rounded-full px-3 py-1 text-xs font-semibold text-tertiary transition-all duration-200 hover:bg-tertiary-fixed hover:brightness-110 focus:outline-none focus:ring-2 focus:ring-primary/40 focus:ring-offset-2"
+          className={`rounded-full px-3 py-1 text-xs font-semibold transition-all duration-200 hover:brightness-110 focus:outline-none focus:ring-2 focus:ring-primary/40 focus:ring-offset-2 ${
+            status === 'cancelled'
+              ? 'text-primary bg-primary/10'
+              : 'text-tertiary bg-tertiary-fixed'
+          }`}
         >
-          Cancel
+          {status === 'cancelled' ? 'Activate' : 'Cancel'}
         </button>
       </div>
     </motion.article>

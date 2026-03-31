@@ -10,6 +10,9 @@ import NotificationsPage from './pages/NotificationsPage'
 import ScanPage from './pages/ScanPage'
 import SubscriptionDetailPage from './pages/SubscriptionDetailPage'
 import DemoResetPage from './pages/DemoResetPage'
+import LoginPage from './pages/LoginPage'
+import AccountPage from './pages/AccountPage'
+import ProtectedRoute from './components/ProtectedRoute'
 
 function App() {
   const location = useLocation()
@@ -40,12 +43,44 @@ function App() {
       <AnimatePresence mode="wait">
         <Routes location={location} key={location.pathname}>
           <Route path="/" element={<LandingPage />} />
-          <Route path="/scan" element={<ScanPage />} />
-          <Route path="/add" element={<AddManuallyPage />} />
-          <Route path="/confirm" element={<ConfirmPage />} />
-          <Route path="/dashboard" element={<DashboardPage />} />
-          <Route path="/subscription/:id" element={<SubscriptionDetailPage />} />
-          <Route path="/notifications" element={<NotificationsPage />} />
+          <Route path="/login" element={<LoginPage />} />
+          
+          {/* Protected Routes */}
+          <Route path="/scan" element={
+            <ProtectedRoute>
+              <ScanPage />
+            </ProtectedRoute>
+          } />
+          <Route path="/add" element={
+            <ProtectedRoute>
+              <AddManuallyPage />
+            </ProtectedRoute>
+          } />
+          <Route path="/confirm" element={
+            <ProtectedRoute>
+              <ConfirmPage />
+            </ProtectedRoute>
+          } />
+          <Route path="/dashboard" element={
+            <ProtectedRoute>
+              <DashboardPage />
+            </ProtectedRoute>
+          } />
+          <Route path="/subscription/:id" element={
+            <ProtectedRoute>
+              <SubscriptionDetailPage />
+            </ProtectedRoute>
+          } />
+          <Route path="/notifications" element={
+            <ProtectedRoute>
+              <NotificationsPage />
+            </ProtectedRoute>
+          } />
+          <Route path="/account" element={
+            <ProtectedRoute>
+              <AccountPage />
+            </ProtectedRoute>
+          } />
           <Route path="/demo" element={<DemoResetPage />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>

@@ -6,16 +6,21 @@ import api from '../api/client'
 import Skeleton from '../components/Skeleton'
 import { useDocumentTitle } from '../hooks/useDocumentTitle'
 import { formatDate, formatINR } from '../utils/formatUtils'
+import toast from 'react-hot-toast'
+import { motion } from 'framer-motion'
 
 /* ─── Toggle pill ─── */
-function TogglePill({ isOn, onToggle, label }) {
+function TogglePill({ isOn, onToggle, label, disabled }) {
   return (
     <button
       type="button"
       aria-label={label}
       aria-pressed={isOn}
+      disabled={disabled}
       onClick={onToggle}
-      className={`relative h-6 w-12 rounded-full transition-colors ${isOn ? 'bg-primary' : 'bg-outline-variant/30'} hover:brightness-110 focus:outline-none focus:ring-2 focus:ring-primary/40 focus:ring-offset-2 transition-all duration-200`}
+      className={`relative h-6 w-12 rounded-full transition-all duration-200 ${
+        isOn ? 'bg-primary' : 'bg-outline-variant/30'
+      } ${disabled ? 'opacity-50 cursor-not-allowed' : 'hover:brightness-110'} focus:outline-none focus:ring-2 focus:ring-primary/40 focus:ring-offset-2`}
     >
       <span className={`absolute top-0.5 h-5 w-5 rounded-full bg-white transition-transform ${isOn ? 'translate-x-6' : 'translate-x-0.5'}`} />
     </button>
@@ -24,9 +29,9 @@ function TogglePill({ isOn, onToggle, label }) {
 
 /* ─── Channel badge ─── */
 function ChannelBadge({ channel }) {
-  if (channel === 'email') return <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-bold text-primary">{channel}</span>
-  if (channel === 'sms')   return <span className="rounded-full bg-secondary/10 px-2 py-0.5 text-[10px] font-bold text-secondary">{channel}</span>
-  return <span className="rounded-full bg-surface-container px-2 py-0.5 text-[10px] font-bold text-outline">simulated</span>
+  if (channel === 'email') return <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-bold text-primary capitalize">{channel}</span>
+  if (channel === 'sms')   return <span className="rounded-full bg-secondary/10 px-2 py-0.5 text-[10px] font-bold text-secondary capitalize">{channel}</span>
+  return <span className="rounded-full bg-surface-container px-2 py-0.5 text-[10px] font-bold text-outline">Push</span>
 }
 
 function formatRelativeTime(dateString) {
@@ -40,184 +45,217 @@ function formatRelativeTime(dateString) {
 }
 
 function NotificationsPage() {
-  useDocumentTitle('Reminders — NiroCore')
+  useDocumentTitle('Reminder Center — NiroCore')
   const navigate = useNavigate()
 
-  const [emailDigest, setEmailDigest] = useState(true)
-  const [smsAlerts,   setSmsAlerts]   = useState(true)
-  const [inAppPush,   setInAppPush]   = useState(false)
-
-  const [reminders,    setReminders]    = useState([])
-  const [loading,      setLoading]      = useState(true)
-  const [activeFilter, setActiveFilter] = useState('All')
+  const [subscriptions, setSubscriptions] = useState([])
+  const [reminders,      setReminders]     = useState([])
+  const [loading,        setLoading]       = useState(true)
+  const [updatingId,     setUpdatingId]    = useState(null)
 
   useEffect(() => {
-    api.get('/api/reminders')
-      .then(r => setReminders(r.data))
-      .catch(() => {})
-      .finally(() => setLoading(false))
+    const fetchData = async () => {
+      try {
+        const [subsRes, logsRes] = await Promise.all([
+          api.get('/api/subscriptions'),
+          api.get('/api/reminders')
+        ])
+        setSubscriptions(subsRes.data.filter(s => s.status === 'active'))
+        setReminders(logsRes.data)
+      } catch (err) {
+        console.error('Fetch error:', err)
+      } finally {
+        setLoading(false)
+      }
+    }
+    fetchData()
   }, [])
 
-  const filteredReminders = useMemo(() => {
-    if (activeFilter === 'All') return reminders
-    return reminders.filter(r => r.channel.toLowerCase() === activeFilter.toLowerCase())
-  }, [reminders, activeFilter])
+  const handleToggle = async (subId, channel) => {
+    const sub = subscriptions.find(s => s.id === subId)
+    if (!sub) return
+
+    const newReminders = {
+      ...sub.reminders,
+      [channel]: !sub.reminders[channel]
+    }
+
+    setUpdatingId(`${subId}-${channel}`)
+    try {
+      await api.patch(`/api/subscriptions/${subId}`, { reminders: newReminders })
+      setSubscriptions(prev => prev.map(s => 
+        s.id === subId ? { ...s, reminders: newReminders } : s
+      ))
+      toast.success(`${channel.toUpperCase()} preference updated.`)
+    } catch {
+      toast.error('Failed to update preference.')
+    } finally {
+      setUpdatingId(null)
+    }
+  }
 
   return (
     <PageLayout activePage="reminders">
-      <PageTransition>
-        <div className="max-w-screen-2xl mx-auto px-4 md:px-8 lg:px-12 pb-16">
+      <div className="max-w-screen-2xl mx-auto px-4 md:px-8 lg:px-12 pb-24 relative z-10">
 
-          {/* Back + header */}
-          <div className="mt-8 mb-8">
-            <button
-              type="button"
-              onClick={() => navigate(-1)}
-              className="mb-6 flex items-center gap-2 text-sm text-on-surface-variant hover:text-primary transition-colors hover:brightness-110 focus:outline-none focus:ring-2 focus:ring-primary/40 focus:ring-offset-2 transition-all duration-200"
-            >
-              <span className="material-symbols-outlined text-base">arrow_back</span>
-              Back
-            </button>
-            <h1 className="font-headline text-3xl md:text-4xl lg:text-5xl font-extrabold tracking-tight text-on-surface">
-              Reminder Center
-            </h1>
-            <p className="mt-2 text-base md:text-lg text-on-surface-variant">
-              Stay ahead of every subscription and renewal.
-            </p>
-          </div>
+        {/* Header */}
+        <div className="mt-8 mb-10">
+          <button
+            type="button"
+            onClick={() => navigate('/dashboard')}
+            className="mb-6 flex items-center gap-2 text-sm text-on-surface-variant hover:text-primary transition-colors font-medium cursor-pointer"
+          >
+            <span className="material-symbols-outlined text-base">arrow_back</span>
+            Back to Dashboard
+          </button>
+          <h1 className="font-headline text-4xl md:text-5xl font-extrabold tracking-tight text-on-surface">
+            Reminder Center
+          </h1>
+          <p className="mt-2 text-lg text-on-surface-variant max-w-2xl">
+            Manage how and when you're notified about upcoming renewals.
+          </p>
+        </div>
 
-          {/* ── Mobile: stacked layout. Desktop: 2-col grid ── */}
-          <div className="flex flex-col gap-6 lg:grid lg:grid-cols-12 lg:gap-8">
-
-            {/* Delivery channels — TOP on mobile */}
-            <aside className="space-y-6 lg:col-span-4 order-1">
-              <article className="w-full rounded-2xl bg-surface-container-lowest p-6 md:p-8 shadow-[0_32px_48px_-4px_rgba(25,27,36,0.06)]">
-                <h3 className="font-headline text-xl md:text-2xl font-bold tracking-tight text-on-surface">Delivery Channels</h3>
-                <div className="mt-5 space-y-3">
-                  {[
-                    { icon: 'mail', label: 'Email Digest', sub: 'Weekly report & alerts', isOn: emailDigest, onToggle: () => setEmailDigest(p => !p), ariaLabel: 'Toggle Email Digest', color: 'text-primary bg-primary-container/20' },
-                    { icon: 'sms', label: 'SMS Alerts', sub: 'Instant payment failures', isOn: smsAlerts, onToggle: () => setSmsAlerts(p => !p), ariaLabel: 'Toggle SMS Alerts', color: 'text-secondary bg-secondary-container/20' },
-                    { icon: 'notifications_active', label: 'In-app Push', sub: 'Daily smart summaries', isOn: inAppPush, onToggle: () => setInAppPush(p => !p), ariaLabel: 'Toggle In-app Push', color: 'text-tertiary bg-tertiary-container/20' },
-                  ].map(ch => (
-                    <div key={ch.label} className="flex min-h-[56px] items-center justify-between rounded-xl bg-surface-container p-4">
-                      <div className="flex items-center gap-3">
-                        <span className={`material-symbols-outlined rounded-lg p-2 ${ch.color}`}>{ch.icon}</span>
-                        <div>
-                          <p className="font-semibold text-on-surface">{ch.label}</p>
-                          <p className="text-xs text-on-surface-variant">{ch.sub}</p>
-                        </div>
-                      </div>
-                      <TogglePill isOn={ch.isOn} onToggle={ch.onToggle} label={ch.ariaLabel} />
-                    </div>
-                  ))}
-                </div>
-              </article>
-
-              {/* Smart prediction — BOTTOM on mobile */}
-              <article className="relative w-full overflow-hidden rounded-2xl bg-primary p-6 md:p-8 text-white shadow-xl order-last">
-                <div className="absolute right-0 top-0 h-32 w-32 rounded-full bg-primary-container/30 blur-3xl" />
-                <div className="relative z-10">
-                  <span className="material-symbols-outlined mb-4 block text-4xl" style={{ fontVariationSettings: "'FILL' 1" }}>auto_awesome</span>
-                  <h3 className="font-headline text-xl md:text-2xl font-bold">Smart Prediction</h3>
-                  <p className="mt-3 text-sm md:text-base text-white/90 leading-relaxed">
-                    We detect spending trends and highlight months where renewal clusters may impact your balance.
-                  </p>
-                  <button
-                    type="button"
-                    className="mt-6 w-full md:w-auto rounded-full bg-white px-6 py-3 text-xs font-bold uppercase tracking-widest text-primary hover:brightness-110 focus:outline-none focus:ring-2 focus:ring-primary/40 focus:ring-offset-2 transition-all duration-200"
-                  >
-                    Set Buffer Alert
-                  </button>
-                </div>
-              </article>
-            </aside>
-
-            {/* ── Timeline ── */}
-            <div className="w-full lg:col-span-8 order-2 min-h-[300px] overflow-hidden">
-              {/* Filter chips */}
-              <div className="mb-5 flex gap-2 overflow-x-auto scrollbar-hide pb-1">
-                {['All', 'Email', 'SMS', 'Simulated'].map(chip => (
-                  <button
-                    key={chip}
-                    type="button"
-                    onClick={() => setActiveFilter(chip)}
-                    className={`shrink-0 cursor-pointer rounded-full px-4 py-2 text-sm font-semibold transition-all duration-200 hover:brightness-110 focus:outline-none focus:ring-2 focus:ring-primary/40 focus:ring-offset-2 ${activeFilter === chip ? 'bg-on-surface text-surface' : 'bg-surface-container text-on-surface-variant'}`}
-                  >
-                    {chip}
-                  </button>
-                ))}
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+          
+          {/* ── SECTION 1: SUBSCRIPTION SETTINGS ── */}
+          <div className="lg:col-span-12 xl:col-span-8 order-2 xl:order-1">
+            <section className="bg-surface-container-lowest rounded-[2rem] border border-outline-variant/10 shadow-[0_8px_32px_-4px_rgba(25,27,36,0.06)] overflow-hidden relative z-20">
+              <div className="p-6 md:p-8 border-b border-outline-variant/10 flex items-center justify-between">
+                <h3 className="font-headline text-2xl font-bold text-on-surface">Manage Subscriptions</h3>
+                <span className="text-xs font-bold text-on-surface-variant uppercase tracking-widest px-3 py-1 bg-surface-container rounded-full">
+                  {subscriptions.length} Linked
+                </span>
               </div>
 
-              {loading ? (
-                <div className="space-y-4 py-6">
-                  {[1, 2, 3].map((i) => (
-                    <div key={i} className="rounded-2xl bg-surface-container-lowest p-5 shadow-sm border border-outline-variant/10">
-                      <Skeleton className="h-5 w-[60%] mb-3" />
-                      <div className="flex items-center gap-3">
-                        <Skeleton className="h-4 w-16" />
-                        <Skeleton className="h-3 w-[28%]" />
-                      </div>
-                      <div className="mt-4 flex items-center gap-2 flex-wrap">
-                        <Skeleton className="h-5 w-20 rounded-xl" />
-                        <Skeleton className="h-3 w-[30%] rounded-xl" />
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              ) : reminders.length === 0 ? (
-                <div className="border-2 border-dashed border-outline-variant/30 rounded-2xl p-16 flex flex-col items-center justify-center text-center min-h-[300px] w-full">
-                  <span className="material-symbols-outlined text-5xl text-outline mb-4">
-                    notifications_off
-                  </span>
-                  <h5 className="font-headline font-bold text-lg text-on-surface mb-2">
-                    No reminders yet
-                  </h5>
-                  <p className="text-sm text-on-surface-variant max-w-xs leading-relaxed mb-6">
-                    Add a subscription to start tracking renewals.
-                  </p>
-                  <button
-                    type="button"
-                    onClick={() => navigate('/add')}
-                    className="px-6 py-3 rounded-full signature-gradient text-white font-bold text-sm tracking-wider uppercase shadow-lg hover:brightness-110 active:scale-95 transition-all"
-                  >
-                    Add Subscription
-                  </button>
-                </div>
-              ) : (
-                <div className="space-y-4">
-                  {filteredReminders.map(log => (
-                    <div key={log.id} className="rounded-2xl bg-surface-container-lowest p-5 shadow-sm border border-outline-variant/10">
-                      {/* Top row */}
-                      <div className="flex items-start justify-between gap-3">
-                        <h4 className="font-headline text-base font-bold text-on-surface truncate">
-                          {log.subscription?.serviceName || 'Unknown Service'}
-                        </h4>
-                        {log.subscription?.amount && (
-                          <p className="font-headline text-base font-bold text-on-surface shrink-0">
-                            {formatINR(Number(log.subscription.amount))}
-                          </p>
-                        )}
-                      </div>
-                      {/* Bottom row */}
-                      <div className="mt-3 flex items-center gap-2 flex-wrap">
-                        <ChannelBadge channel={log.channel} />
-                        <span className="text-[10px] text-on-surface-variant">{formatRelativeTime(log.sentAt)}</span>
-                        <span className={`ml-auto rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-widest ${log.status === 'sent' ? 'bg-secondary-container text-on-secondary-container' : 'bg-red-100 text-red-600'}`}>
-                          {log.status}
-                        </span>
+              <div className="divide-y divide-outline-variant/10">
+                {loading ? (
+                  [1, 2, 3].map(i => (
+                    <div key={i} className="p-6 animate-pulse">
+                      <div className="flex items-center gap-4">
+                        <div className="h-12 w-12 rounded-xl bg-surface-container" />
+                        <div className="space-y-2 flex-1">
+                          <div className="h-4 w-32 bg-surface-container rounded" />
+                          <div className="h-3 w-16 bg-surface-container rounded" />
+                        </div>
+                        <div className="flex gap-2">
+                          <div className="h-6 w-10 bg-surface-container rounded-full" />
+                          <div className="h-6 w-10 bg-surface-container rounded-full" />
+                        </div>
                       </div>
                     </div>
-                  ))}
+                  ))
+                ) : subscriptions.length === 0 ? (
+                  <div className="p-20 text-center flex flex-col items-center justify-center gap-4">
+                    <div className="h-16 w-16 rounded-full bg-surface-container flex items-center justify-center text-outline">
+                        <span className="material-symbols-outlined text-3xl">notifications_off</span>
+                    </div>
+                    <div>
+                      <h4 className="font-headline text-xl font-bold text-on-surface">No active subscriptions</h4>
+                      <p className="text-on-surface-variant text-sm mt-1">Add your first subscription to configure alerts.</p>
+                    </div>
+                    <button 
+                      onClick={() => navigate('/add')}
+                      className="mt-2 signature-gradient px-8 py-3 rounded-full text-white font-bold text-sm tracking-widest uppercase shadow-lg hover:brightness-110 active:scale-95 transition-all cursor-pointer"
+                    >
+                      Add Subscription
+                    </button>
+                  </div>
+                ) : (
+                  subscriptions.map(sub => (
+                    <div 
+                      key={sub.id} 
+                      className="p-6 md:p-8 flex flex-col md:flex-row md:items-center justify-between gap-6 hover:bg-surface-container/30 transition-colors"
+                    >
+                      <div className="flex items-center gap-4 min-w-0">
+                        <div className="h-12 w-12 shrink-0 rounded-xl bg-primary/10 flex items-center justify-center text-primary">
+                          <span className="material-symbols-outlined">
+                            {sub.category === 'OTT' ? 'smart_display' : sub.category === 'Music' ? 'music_note' : 'category'}
+                          </span>
+                        </div>
+                        <div className="min-w-0">
+                          <h4 className="font-headline text-lg font-bold text-on-surface truncate">{sub.serviceName}</h4>
+                          <p className="text-xs text-on-surface-variant font-medium">Renews {formatDate(sub.nextRenewalDate)}</p>
+                        </div>
+                      </div>
 
-                  {filteredReminders.length === 0 && (
-                    <div className="py-10 text-center text-sm text-on-surface-variant">No reminders match this filter.</div>
-                  )}
-                </div>
-              )}
-            </div>
+                      <div className="flex flex-wrap items-center gap-x-8 gap-y-4">
+                        {[
+                          { id: 'push',  label: 'Push',  icon: 'notifications_active' },
+                          { id: 'email', label: 'Email', icon: 'mail' },
+                          { id: 'sms',   label: 'SMS',   icon: 'sms' },
+                        ].map(channel => (
+                          <div key={channel.id} className="flex items-center gap-3">
+                            <span className="material-symbols-outlined text-on-surface-variant text-lg">{channel.icon}</span>
+                            <span className="text-xs font-bold text-on-surface-variant uppercase tracking-widest w-12">{channel.label}</span>
+                            <TogglePill 
+                              isOn={sub.reminders?.[channel.id] ?? false} 
+                              onToggle={() => handleToggle(sub.id, channel.id)}
+                              label={`Toggle ${channel.label} for ${sub.serviceName}`}
+                              disabled={updatingId === `${sub.id}-${channel.id}`}
+                            />
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+            </section>
           </div>
+
+          {/* ── SECTION 2: RECENT HISTORY ── */}
+          <div className="lg:col-span-12 xl:col-span-4 order-1 xl:order-2 space-y-6">
+            <aside className="bg-surface-container rounded-[2rem] p-8 border border-outline-variant/10 shadow-sm overflow-hidden relative z-20">
+              <div className="flex items-center justify-between mb-6">
+                <h3 className="font-headline text-xl font-bold text-on-surface">Recent Activity</h3>
+                <span className="material-symbols-outlined text-on-surface-variant">history</span>
+              </div>
+
+              <div className="space-y-4 max-h-[500px] overflow-y-auto pr-2 scrollbar-hide">
+                {loading ? (
+                  [1, 2, 3, 4].map(i => <Skeleton key={i} className="h-16 w-full rounded-xl" />)
+                ) : reminders.length === 0 ? (
+                  <div className="py-12 text-center">
+                    <p className="text-sm text-on-surface-variant italic">No interactions yet.</p>
+                  </div>
+                ) : (
+                  reminders.map(log => (
+                    <div key={log.id} className="bg-surface-container-lowest border border-outline-variant/5 rounded-xl p-4 flex items-start gap-3">
+                      <div className={`mt-1 h-8 w-8 rounded-full flex items-center justify-center shrink-0 ${log.status === 'sent' ? 'bg-secondary/10 text-secondary' : 'bg-error/10 text-error'}`}>
+                          <span className="material-symbols-outlined text-sm">{log.status === 'sent' ? 'done' : 'error'}</span>
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <p className="text-sm font-bold text-on-surface truncate">
+                          {log.subscription?.serviceName || 'Reminder Sent'}
+                        </p>
+                        <div className="mt-1 flex items-center gap-2">
+                            <ChannelBadge channel={log.channel} />
+                            <span className="text-[10px] text-on-surface-variant font-medium">
+                              {formatRelativeTime(log.sentAt)}
+                            </span>
+                        </div>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+
+              <div className="mt-8 p-6 rounded-2xl bg-indigo-900 text-white relative overflow-hidden">
+                  <div className="absolute -right-8 -top-8 h-32 w-32 rounded-full bg-white/10 blur-2xl" />
+                  <div className="relative z-10">
+                    <span className="material-symbols-outlined mb-2 text-primary-fixed">auto_awesome</span>
+                    <h4 className="font-headline font-bold text-lg">Smart Buffers</h4>
+                    <p className="text-xs text-white/70 mt-1 leading-relaxed">
+                      We detect spending clusters and warn you about high-impact renewal months.
+                    </p>
+                  </div>
+              </div>
+            </aside>
+          </div>
+
         </div>
-      </PageTransition>
+      </div>
     </PageLayout>
   )
 }

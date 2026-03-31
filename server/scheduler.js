@@ -18,6 +18,7 @@ export function startScheduler() {
     try {
       const subscriptions = await prisma.subscription.findMany({
         where: { status: 'active' },
+        include: { user: true },
       });
 
       const todayStart = new Date();

@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { body, validationResult } from 'express-validator';
 import prisma from '../lib/prisma.js';
 import { subscriptionRules, validate } from '../middleware/validate.js';
+import { processAutoRenewals } from '../services/subscriptionService.js';
 
 const router = Router();
 
@@ -22,8 +23,13 @@ function getRiskLevel(daysUntilRenewal) {
 
 function enrichSubscription(sub) {
   const daysUntilRenewal = getDaysUntilRenewal(sub.nextRenewalDate);
+  const reminders = sub.remindersJson 
+    ? JSON.parse(sub.remindersJson) 
+    : { push: true, email: true, sms: false };
+
   return {
     ...sub,
+    reminders,
     daysUntilRenewal,
     riskLevel: getRiskLevel(daysUntilRenewal),
   };
@@ -46,6 +52,7 @@ function handleValidationErrors(req, res) {
 // ─── GET /  — list all ──────────────────────────────────────────
 router.get('/', async (req, res) => {
   try {
+    await processAutoRenewals();
     const subscriptions = await prisma.subscription.findMany({
       orderBy: { nextRenewalDate: 'asc' },
     });
@@ -60,6 +67,7 @@ router.get('/', async (req, res) => {
 // ─── GET /stats  — aggregated dashboard stats ───────────────────
 router.get('/stats', async (req, res) => {
   try {
+    await processAutoRenewals();
     const subscriptions = await prisma.subscription.findMany();
 
     const now = new Date();
@@ -128,7 +136,25 @@ router.post(
   validate,
   async (req, res) => {
     try {
-      const { serviceName, category, amount, billingCycle, nextRenewalDate, sourceType, notes } = req.body;
+      const { serviceName, category, amount, billingCycle, nextRenewalDate, sourceType, notes, reminders, userEmail } = req.body;
+
+      // Ensure userEmail is provided so subscription is always linked to a user
+      if (!userEmail) {
+        return res.status(400).json({ error: 'User email (userEmail) is required to create a subscription.' });
+      }
+
+      // New validation for Phone number if SMS/WhatsApp is selected
+      if (reminders && (reminders.sms || reminders.whatsapp)) {
+        const user = await prisma.user.findUnique({
+          where: { email: userEmail },
+        });
+
+        if (!user || !user.phone) {
+          return res.status(422).json({ 
+            errors: [{ field: 'reminders', message: 'Phone number required for SMS/WhatsApp notifications.' }] 
+          });
+        }
+      }
 
       const subscription = await prisma.subscription.create({
         data: {
@@ -139,9 +165,17 @@ router.post(
           nextRenewalDate: new Date(nextRenewalDate),
           sourceType: sourceType || 'manual',
           notes: notes || null,
+          remindersJson: reminders ? JSON.stringify(reminders) : JSON.stringify({ push: true, email: true, sms: false, whatsapp: false }),
+          user: { 
+            connectOrCreate: {
+              where: { email: userEmail },
+              create: { email: userEmail, name: userEmail.split('@')[0] }
+            }
+          }
         },
       });
 
+      console.log(`[SUBSCRIPTION] Created ${subscription.id} linked to user email: ${userEmail}`);
       res.status(201).json(enrichSubscription(subscription));
     } catch (err) {
       console.error('POST /api/subscriptions error:', err);
@@ -177,7 +211,7 @@ router.patch(
 
       const allowedFields = [
         'serviceName', 'category', 'amount', 'billingCycle',
-        'nextRenewalDate', 'sourceType', 'status', 'notes',
+        'nextRenewalDate', 'sourceType', 'status', 'notes', 'reminders'
       ];
 
       const data = {};
@@ -187,6 +221,8 @@ router.patch(
             data[field] = parseFloat(req.body[field]);
           } else if (field === 'nextRenewalDate') {
             data[field] = new Date(req.body[field]);
+          } else if (field === 'reminders') {
+            data['remindersJson'] = JSON.stringify(req.body[field]);
           } else {
             data[field] = req.body[field];
           }

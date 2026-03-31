@@ -2,6 +2,7 @@ import { motion } from 'framer-motion'
 import { useEffect, useMemo, useState } from 'react'
 import toast from 'react-hot-toast'
 import { useNavigate } from 'react-router-dom'
+import { useAuth } from '../contexts/AuthContext'
 import api from '../api/client'
 import PageLayout from '../components/PageLayout'
 import PageTransition from '../components/PageTransition'
@@ -17,7 +18,7 @@ const pageVariants = {
   exit: { opacity: 0, y: -8 },
 }
 
-const filterChips = ['All', 'OTT', 'Music', 'Food', 'Productivity', 'Risky']
+const filterChips = ['All', 'OTT', 'Music', 'Food', 'Productivity', 'Cancelled', 'Risky']
 
 function getCategoryIcon(category) {
   const map = {
@@ -60,6 +61,7 @@ function ScrollDots({ count, activeIndex }) {
 function DashboardPage() {
   useDocumentTitle('Dashboard — NiroCore')
   const navigate = useNavigate()
+  const { user: authUser } = useAuth()
   const [subscriptions, setSubscriptions] = useState([])
   const [stats, setStats] = useState(null)
   const [loading, setLoading] = useState(true)
@@ -89,23 +91,37 @@ function DashboardPage() {
     if (activeFilter === 'All') return subscriptions
     if (activeFilter === 'Risky')
       return subscriptions.filter((s) => s.riskLevel === 'high')
+    if (activeFilter === 'Cancelled')
+      return subscriptions.filter((s) => s.status === 'cancelled')
     return subscriptions.filter((s) => s.category === activeFilter)
   }, [activeFilter, subscriptions])
 
-  const handleCancel = async (id) => {
+  const handleToggleStatus = async (id, currentStatus) => {
+    const newStatus = currentStatus === 'cancelled' ? 'active' : 'cancelled'
     try {
-      await api.patch(`/api/subscriptions/${id}`, { status: 'cancelled' })
+      await api.patch(`/api/subscriptions/${id}`, { status: newStatus })
       setSubscriptions((prev) =>
-        prev.map((s) => (s.id === id ? { ...s, status: 'cancelled' } : s)),
+        prev.map((s) => (s.id === id ? { ...s, status: newStatus } : s)),
       )
-      toast.success('Marked as cancelled.')
+      
+      // Re-fetch stats to update Monthly Spend / Yearly Spend highlights
+      const statsRes = await api.get('/api/subscriptions/stats')
+      setStats(statsRes.data)
+
+      toast.success(newStatus === 'active' ? 'Subscription restored!' : 'Marked as cancelled.')
     } catch {
-      toast.error('Failed to cancel subscription.')
+      toast.error(`Failed to ${newStatus === 'active' ? 'restore' : 'cancel'} subscription.`)
     }
   }
 
-  const handleRemind = () => {
-    toast('Reminder sent! 📬', { icon: '🔔' })
+  const handleRemind = async (id) => {
+    try {
+      toast.loading('Sending reminder...', { id: 'remind' })
+      await api.post(`/api/reminders/trigger/${id}`, { userEmail: authUser?.email })
+      toast.success('Reminder sent! 📬', { id: 'remind' })
+    } catch {
+      toast.error('Failed to send reminder.', { id: 'remind' })
+    }
   }
 
   // Handle stat strip scroll for dots
@@ -313,8 +329,8 @@ function DashboardPage() {
                   daysUntilRenewal={subscription.daysUntilRenewal}
                   riskLevel={subscription.riskLevel}
                   onView={() => navigate(`/subscription/${subscription.id}`)}
-                  onRemind={() => handleRemind()}
-                  onCancel={() => handleCancel(subscription.id)}
+                  onRemind={() => handleRemind(subscription.id)}
+                  onCancel={() => handleToggleStatus(subscription.id, subscription.status)}
                 />
               ))}
             </div>

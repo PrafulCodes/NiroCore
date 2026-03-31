@@ -115,3 +115,16 @@ nav {
   right: 0 !important;
   z-index: 9999 !important;
 }
+
+button,
+a,
+[role="button"],
+[tabindex="0"],
+.cursor-pointer,
+select,
+label[for],
+input[type="checkbox"],
+input[type="radio"],
+input[type="file"] {
+  cursor: pointer !important;
+}

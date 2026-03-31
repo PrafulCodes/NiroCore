@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import toast from 'react-hot-toast'
 import { useNavigate, useParams } from 'react-router-dom'
 import api from '../api/client'
+import { useAuth } from '../contexts/AuthContext'
 import PageLayout from '../components/PageLayout'
 import PageTransition from '../components/PageTransition'
 import Spinner from '../components/Spinner'
@@ -48,6 +49,7 @@ function getCategoryIcon(category) {
 function SubscriptionDetailPage() {
   const navigate = useNavigate()
   const { id } = useParams()
+  const { user: authUser } = useAuth()
   
   const [subscription, setSubscription] = useState(null)
   
@@ -72,6 +74,14 @@ function SubscriptionDetailPage() {
       setLoading(false)
     }
   }
+
+  const annualCost = useMemo(() => {
+    if (!subscription) return 0
+    const multiplier = 
+      subscription.billingCycle === 'Yearly' ? 1 : 
+      subscription.billingCycle === 'Quarterly' ? 4 : 12
+    return subscription.amount * multiplier
+  }, [subscription])
 
   const fetchReminders = async () => {
     try {
@@ -144,7 +154,7 @@ function SubscriptionDetailPage() {
   const handleRemindMe = async () => {
     try {
       toast.loading('Sending reminder...', { id: 'remind' })
-      await api.post(`/api/reminders/trigger/${id}`)
+      await api.post(`/api/reminders/trigger/${id}`, { userEmail: authUser?.email })
       toast.success('Reminder sent!', { id: 'remind' })
       fetchReminders() // Refetch history
     } catch (err) {
