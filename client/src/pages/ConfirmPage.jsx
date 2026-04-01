@@ -8,7 +8,7 @@ import PageTransition from '../components/PageTransition'
 import Spinner from '../components/Spinner'
 import confetti from 'canvas-confetti'
 import { useDocumentTitle } from '../hooks/useDocumentTitle'
-import { formatINR } from '../utils/formatUtils'
+import { formatDate } from '../utils/formatUtils'
 
 const categoryOptions = ['OTT', 'Music', 'Food', 'Productivity', 'Cloud', 'Fitness', 'Gaming', 'Other']
 
@@ -35,6 +35,9 @@ function ConfirmPage() {
   const navigate = useNavigate()
   const location = useLocation()
   const stateData = location.state
+  const data = stateData
+
+  console.log('[Confirm Subscription] Incoming data:', data)
 
   const [submitting, setSubmitting] = useState(false)
   const [errors, setErrors] = useState({})
@@ -42,13 +45,18 @@ function ConfirmPage() {
   const [formData, setFormData] = useState({
     serviceName:     stateData?.serviceName     || '',
     category:        stateData?.category        || 'OTT',
-    amount:          stateData?.amount          || '',
-    billingCycle:    stateData?.billingCycle    || 'Monthly',
-    nextRenewalDate: stateData?.nextRenewalDate || '',
+    amount:          stateData?.amount ?? '',
+    billingCycle:    stateData?.billingCycle && stateData?.billingCycle !== 'Unknown' ? stateData?.billingCycle : '',
+    nextRenewalDate: stateData?.nextRenewalDate ?? '',
     confidence:      stateData?.confidence      || 'Medium',
   })
 
   const confidenceClassName = useMemo(() => getConfidenceStyles(formData.confidence), [formData.confidence])
+  const hasAmount = formData.amount !== null && formData.amount !== undefined && formData.amount !== ''
+  const amountDisplay = formData.amount !== null && formData.amount !== undefined && formData.amount !== '' ? `₹${formData.amount}` : 'Not detected'
+  const billingCycleDisplay = formData.billingCycle && formData.billingCycle !== 'Unknown' ? formData.billingCycle : 'Not detected'
+  const renewalDisplay = formData.nextRenewalDate ? formatDate(formData.nextRenewalDate) : 'Not available'
+  const showMissingDataWarning = stateData?.amount === null || stateData?.nextRenewalDate === null
 
   /* ── Empty state guard ── */
   if (!stateData) {
@@ -96,6 +104,9 @@ function ConfirmPage() {
     const rawErrors = {}
     if (!formData.serviceName)     rawErrors.serviceName     = 'Service Name is required'
     if (!formData.amount)          rawErrors.amount          = 'Amount is required'
+    if (!formData.billingCycle || formData.billingCycle === 'Unknown' || formData.billingCycle === 'Variable') {
+      rawErrors.billingCycle = 'Please select Monthly, Quarterly, or Yearly.'
+    }
     if (!formData.nextRenewalDate) rawErrors.nextRenewalDate = 'Renewal Date is required'
 
     if (Object.keys(rawErrors).length > 0) {
@@ -207,9 +218,10 @@ function ConfirmPage() {
                   </div>
                   <div className="text-right">
                     <p className="font-headline text-3xl md:text-4xl font-extrabold tracking-tighter text-on-surface">
-                      {formatINR(Number(formData.amount || 0))}
+                      {amountDisplay}
                     </p>
-                    <p className="text-sm text-on-surface-variant">/ cycle</p>
+                    <p className="text-sm text-on-surface-variant">Cycle: {billingCycleDisplay}</p>
+                    <p className="text-sm text-on-surface-variant">Next renewal: {renewalDisplay}</p>
                   </div>
                 </div>
 
@@ -229,6 +241,12 @@ function ConfirmPage() {
                 {formData.confidence === 'Low' && (
                   <div className="mb-5 rounded-xl bg-tertiary-fixed/30 p-3 text-sm text-tertiary">
                     OCR wasn't perfect — please fill in any missing information before saving.
+                  </div>
+                )}
+
+                {showMissingDataWarning && (
+                  <div className="mb-5 rounded-xl bg-tertiary-fixed/30 p-3 text-sm text-tertiary">
+                    Some details could not be detected. Please verify before confirming.
                   </div>
                 )}
 
@@ -272,12 +290,15 @@ function ConfirmPage() {
                     <label className="block text-[10px] font-bold uppercase tracking-[0.15em] text-on-surface-variant mb-2">Billing Cycle</label>
                     <div className="relative">
                       <select name="billingCycle" value={formData.billingCycle} onChange={handleChange} className={`${inputClass('billingCycle')} appearance-none cursor-pointer text-base md:text-sm min-h-[48px]`}>
+                        <option value="">Not detected</option>
+                        <option>Variable</option>
                         <option>Monthly</option>
                         <option>Quarterly</option>
                         <option>Yearly</option>
                       </select>
                       <span className="material-symbols-outlined pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-on-surface-variant">expand_more</span>
                     </div>
+                    {errors.billingCycle && <p className="mt-1.5 ml-1 text-xs text-red-500 flex items-center gap-1"><span className="material-symbols-outlined text-[14px]">error</span>{errors.billingCycle}</p>}
                   </div>
 
                   {/* Renewal date */}

@@ -136,6 +136,7 @@ router.post(
   validate,
   async (req, res) => {
     try {
+      console.log('[Autopay Scan] Incoming POST /subscriptions data:', req.body);
       const { serviceName, category, amount, billingCycle, nextRenewalDate, sourceType, notes, reminders, userEmail } = req.body;
 
       // Ensure userEmail is provided so subscription is always linked to a user
@@ -156,23 +157,27 @@ router.post(
         }
       }
 
-      const subscription = await prisma.subscription.create({
-        data: {
-          serviceName,
-          category,
-          amount: parseFloat(amount),
-          billingCycle,
-          nextRenewalDate: new Date(nextRenewalDate),
-          sourceType: sourceType || 'manual',
-          notes: notes || null,
-          remindersJson: reminders ? JSON.stringify(reminders) : JSON.stringify({ push: true, email: true, sms: false, whatsapp: false }),
-          user: { 
-            connectOrCreate: {
-              where: { email: userEmail },
-              create: { email: userEmail, name: userEmail.split('@')[0] }
-            }
+      const prismaData = {
+        serviceName,
+        category,
+        amount: parseFloat(amount),
+        billingCycle,
+        nextRenewalDate: new Date(nextRenewalDate),
+        sourceType: sourceType || 'manual',
+        notes: notes || null,
+        remindersJson: reminders ? JSON.stringify(reminders) : JSON.stringify({ push: true, email: true, sms: false, whatsapp: false }),
+        user: { 
+          connectOrCreate: {
+            where: { email: userEmail },
+            create: { email: userEmail, name: userEmail.split('@')[0] }
           }
-        },
+        }
+      };
+
+      console.log('[Autopay Scan] Final subscription data for Prisma:', prismaData);
+
+      const subscription = await prisma.subscription.create({
+        data: prismaData,
       });
 
       console.log(`[SUBSCRIPTION] Created ${subscription.id} linked to user email: ${userEmail}`);

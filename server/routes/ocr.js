@@ -22,7 +22,10 @@ router.post('/extract', (req, res, next) => {
 
   try {
     const rawText = await extractFromImage(req.file.path);
+    // Added trace logging
+    console.log('[Autopay Scan] Extracted text length:', rawText.length);
     const parsedData = parseSubscriptionData(rawText);
+    console.log('[Autopay Scan] Parsed Result:', parsedData);
 
     const hasServiceName = !!parsedData.serviceName;
     const hasAmount = parsedData.amount !== null;
